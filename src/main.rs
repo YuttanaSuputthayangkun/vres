@@ -87,11 +87,12 @@ fn process_file(cli: &Cli, src: &Path, width: u32) -> Result<bool, FileError> {
         return Err(FileError::SameAsSource);
     }
 
-    let src_width = ffmpeg::probe_width(src)?;
-    if src_width < width {
+    let probe = ffmpeg::probe(src)?;
+    if probe.width < width {
         println!(
-            "skip {}: width {src_width} is less than {width}",
-            src.display()
+            "skip {}: width {} is less than {width}",
+            src.display(),
+            probe.width
         );
         return Ok(false);
     }
@@ -106,6 +107,6 @@ fn process_file(cli: &Cli, src: &Path, width: u32) -> Result<bool, FileError> {
     }
 
     println!("{} -> {}", src.display(), dst.display());
-    ffmpeg::resize(src, &dst, width, cli.fps, cli.overwrite)?;
+    ffmpeg::resize(src, &dst, width, cli.fps, cli.overwrite, probe.duration)?;
     Ok(true)
 }

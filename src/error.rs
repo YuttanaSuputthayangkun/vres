@@ -17,8 +17,8 @@ pub enum FfmpegError {
         status: ExitStatus,
         stderr: String,
     },
-    /// ffprobe output could not be parsed as a width.
-    InvalidWidth(String),
+    /// ffprobe output could not be parsed.
+    InvalidProbeOutput(String),
 }
 
 impl fmt::Display for FfmpegError {
@@ -38,11 +38,8 @@ impl fmt::Display for FfmpegError {
                 }
                 Ok(())
             }
-            Self::InvalidWidth(output) => {
-                write!(
-                    f,
-                    "could not read video width from ffprobe output {output:?}"
-                )
+            Self::InvalidProbeOutput(output) => {
+                write!(f, "could not parse ffprobe output {output:?}")
             }
         }
     }
