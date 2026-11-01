@@ -38,9 +38,23 @@ fn run(cli: &Cli) -> Result<bool, RunError> {
         eprintln!("note: width {} is not valid, using {width}", cli.width);
     }
 
-    let videos = inputs::collect_videos(&cli.inputs, cli.recursive)?;
+    let mut videos = inputs::collect_videos(&cli.inputs, cli.recursive)?;
     if videos.is_empty() {
         return Err(RunError::NoVideos);
+    }
+
+    let mut skipped = 0;
+    if !cli.include_outputs {
+        let pattern =
+            output::output_pattern(&cli.format, width).map_err(RunError::OutputPattern)?;
+        videos.retain(|src| {
+            let ignore = output::is_output(src, &pattern);
+            if ignore {
+                println!("skip {}: matches output format", src.display());
+                skipped += 1;
+            }
+            !ignore
+        });
     }
 
     if let Some(dir) = &cli.output {
@@ -50,7 +64,7 @@ fn run(cli: &Cli) -> Result<bool, RunError> {
         })?;
     }
 
-    let (mut done, mut skipped, mut failed) = (0, 0, 0);
+    let (mut done, mut failed) = (0, 0);
     for src in &videos {
         match process_file(cli, src, width) {
             Ok(true) => done += 1,

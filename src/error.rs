@@ -130,6 +130,8 @@ pub enum RunError {
     NoVideos,
     /// The output directory could not be created.
     CreateOutputDir { path: PathBuf, source: io::Error },
+    /// The output format could not be turned into a matching pattern.
+    OutputPattern(regex::Error),
 }
 
 impl fmt::Display for RunError {
@@ -145,6 +147,7 @@ impl fmt::Display for RunError {
                     path.display()
                 )
             }
+            Self::OutputPattern(e) => write!(f, "invalid output format pattern: {e}"),
         }
     }
 }
@@ -156,6 +159,7 @@ impl std::error::Error for RunError {
             Self::Inputs(e) => Some(e),
             Self::NoVideos => None,
             Self::CreateOutputDir { source, .. } => Some(source),
+            Self::OutputPattern(e) => Some(e),
         }
     }
 }

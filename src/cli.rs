@@ -38,6 +38,11 @@ pub struct Cli {
     #[arg(short = 'R', long, env = "VRES_RECURSIVE")]
     pub recursive: bool,
 
+    /// Also process input files whose name matches the output format at the
+    /// current width (e.g. clip_720.mp4); these are ignored by default
+    #[arg(long, env = "VRES_INCLUDE_OUTPUTS")]
+    pub include_outputs: bool,
+
     /// Overwrite existing output files instead of skipping them
     #[arg(long, env = "VRES_OVERWRITE")]
     pub overwrite: bool,
