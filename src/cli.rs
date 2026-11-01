@@ -42,6 +42,14 @@ pub struct Cli {
     /// Overwrite existing output files instead of skipping them
     #[arg(long, env = "VRES_OVERWRITE")]
     pub overwrite: bool,
+
+    /// Only print errors
+    #[arg(short, long, env = "VRES_QUIET")]
+    pub quiet: bool,
+
+    /// Print a JSON summary to stdout when done; status lines go to stderr
+    #[arg(long, env = "VRES_JSON")]
+    pub json: bool,
 }
 
 impl Cli {

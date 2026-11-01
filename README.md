@@ -36,6 +36,10 @@ vres -R -o out -f "{source_name}-small" videos/
 | `-R, --recursive` | `VRES_RECURSIVE` | off | Scan subdirectories too. |
 | `--include-outputs` | `VRES_INCLUDE_OUTPUTS` | off | Also process files that already match the output name at the current width. |
 | `--overwrite` | `VRES_OVERWRITE` | off | Replace existing output files instead of skipping them. |
+| `-q, --quiet` | `VRES_QUIET` | off | Only print errors. |
+| `--json` | `VRES_JSON` | off | Print a JSON summary to stdout when done (status lines move to stderr). |
+
+With `--json`, stdout contains only an object with `converted`, `skipped` and `failed` lists. Each entry has `src` and `dst`; skipped entries add a `reason` (`matches_output_format`, `too_narrow` with `width`/`target`, or `output_exists`), and failed entries add an `error` message.
 
 Files are skipped when they're narrower than the target width (no upscaling), when the output already exists, or when they look like a previous output (e.g. `clip_720.mp4`).
 
