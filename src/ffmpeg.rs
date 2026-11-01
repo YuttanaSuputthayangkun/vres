@@ -4,8 +4,6 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
 
-use indicatif::{ProgressBar, ProgressStyle};
-
 use crate::error::FfmpegError;
 
 /// Facts about a source video read by ffprobe.
@@ -79,16 +77,14 @@ pub fn probe(src: &Path) -> Result<Probe, FfmpegError> {
 }
 
 /// Resizes `src` to `width` (height follows aspect ratio) at `fps`, writing `dst`.
-/// Shows a progress bar, prefixed with `counter` (e.g. "2/5"), with an ETA when
-/// the source duration is known.
+/// Calls `on_progress` with the amount of output written so far.
 pub fn resize(
     src: &Path,
     dst: &Path,
     width: u32,
     fps: u32,
     overwrite: bool,
-    duration: Option<Duration>,
-    counter: &str,
+    on_progress: &mut dyn FnMut(Duration),
 ) -> Result<(), FfmpegError> {
     // Progress goes to stdout as key=value lines; stderr only carries errors.
     let mut child = Command::new("ffmpeg")
@@ -117,8 +113,6 @@ pub fn resize(
         buf
     });
 
-    let bar = progress_bar(duration);
-    bar.set_prefix(counter.to_string());
     let stdout = child.stdout.take().expect("stdout is piped");
     for line in BufReader::new(stdout).lines().map_while(Result::ok) {
         // out_time_us is "N/A" until the first frame is written.
@@ -126,7 +120,7 @@ pub fn resize(
             .strip_prefix("out_time_us=")
             .and_then(|v| v.parse::<u64>().ok())
         {
-            bar.set_position((us / 1000).min(bar.length().unwrap_or(u64::MAX)));
+            on_progress(Duration::from_micros(us));
         }
     }
 
@@ -136,33 +130,12 @@ pub fn resize(
     })?;
     let stderr = stderr_reader.join().unwrap_or_default();
     if status.success() {
-        bar.finish();
         Ok(())
     } else {
-        bar.abandon();
         Err(FfmpegError::Failed {
             program: "ffmpeg",
             status,
             stderr: stderr.trim().to_string(),
         })
     }
-}
-
-/// A bar measured in milliseconds of output when `duration` is known, else a spinner.
-fn progress_bar(duration: Option<Duration>) -> ProgressBar {
-    let bar = match duration {
-        Some(d) => ProgressBar::new(d.as_millis() as u64).with_style(
-            ProgressStyle::with_template(
-                "  [{prefix}] [{elapsed_precise}] [{wide_bar:.cyan/blue}] {percent:>3}%  ETA {eta_precise}",
-            )
-            .expect("valid template")
-            .progress_chars("=> "),
-        ),
-        None => ProgressBar::new_spinner().with_style(
-            ProgressStyle::with_template("  [{prefix}] {spinner} [{elapsed_precise}] converting...")
-                .expect("valid template"),
-        ),
-    };
-    bar.enable_steady_tick(Duration::from_millis(200));
-    bar
 }

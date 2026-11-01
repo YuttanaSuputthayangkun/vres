@@ -116,7 +116,7 @@ impl From<FfmpegError> for FileError {
     }
 }
 
-/// Errors that stop `run` before or while setting up the batch.
+/// Errors that stop [`Resizer::run`](crate::Resizer::run) before or while setting up the batch.
 #[derive(Debug)]
 pub enum RunError {
     /// ffmpeg could not be executed.
@@ -127,8 +127,6 @@ pub enum RunError {
     NoVideos,
     /// The output directory could not be created.
     CreateOutputDir { path: PathBuf, source: io::Error },
-    /// The output format could not be turned into a matching pattern.
-    OutputPattern(regex::Error),
 }
 
 impl fmt::Display for RunError {
@@ -144,7 +142,6 @@ impl fmt::Display for RunError {
                     path.display()
                 )
             }
-            Self::OutputPattern(e) => write!(f, "invalid output format pattern: {e}"),
         }
     }
 }
@@ -156,7 +153,6 @@ impl std::error::Error for RunError {
             Self::Inputs(e) => Some(e),
             Self::NoVideos => None,
             Self::CreateOutputDir { source, .. } => Some(source),
-            Self::OutputPattern(e) => Some(e),
         }
     }
 }
@@ -164,5 +160,32 @@ impl std::error::Error for RunError {
 impl From<InputError> for RunError {
     fn from(e: InputError) -> Self {
         Self::Inputs(e)
+    }
+}
+
+/// Errors from [`ResizerBuilder::build`](crate::ResizerBuilder::build).
+#[derive(Debug)]
+pub enum BuildError {
+    /// The frame rate was 0.
+    ZeroFps,
+    /// The output format could not be turned into a matching pattern.
+    OutputPattern(regex::Error),
+}
+
+impl fmt::Display for BuildError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ZeroFps => write!(f, "fps must be at least 1"),
+            Self::OutputPattern(e) => write!(f, "invalid output format pattern: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for BuildError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::ZeroFps => None,
+            Self::OutputPattern(e) => Some(e),
+        }
     }
 }

@@ -15,15 +15,19 @@ fn is_video(path: &Path) -> bool {
 
 /// Expands the given inputs into a list of video files.
 /// Files are taken as-is; directories are scanned for video files.
-pub fn collect_videos(inputs: &[PathBuf], recursive: bool) -> Result<Vec<PathBuf>, InputError> {
+pub fn collect_videos<P: AsRef<Path>>(
+    inputs: &[P],
+    recursive: bool,
+) -> Result<Vec<PathBuf>, InputError> {
     let mut videos = Vec::new();
     for input in inputs {
+        let input = input.as_ref();
         if input.is_file() {
-            videos.push(input.clone());
+            videos.push(input.to_path_buf());
         } else if input.is_dir() {
             scan_dir(input, recursive, &mut videos)?;
         } else {
-            return Err(InputError::NotFound(input.clone()));
+            return Err(InputError::NotFound(input.to_path_buf()));
         }
     }
     Ok(videos)

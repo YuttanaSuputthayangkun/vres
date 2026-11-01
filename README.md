@@ -43,6 +43,23 @@ Files are skipped when they're narrower than the target width (no upscaling), wh
 
 Any option can be set in a `.env` file in the current directory. See [`.env.example`](.env.example). Command-line arguments take precedence over environment variables, which take precedence over `.env`.
 
+## Library
+
+vres is also a library. Turn off the default `cli` feature to skip the CLI-only dependencies (clap, dotenvy, indicatif):
+
+```toml
+vres = { git = "https://github.com/YuttanaSuputthayangkun/vres", default-features = false }
+```
+
+```rust
+use vres::Resizer;
+
+let resizer = Resizer::builder().width(1280).fps(24).recursive(true).build()?;
+let summary = resizer.run(&["videos/"], &mut ())?;
+```
+
+Pass your own `vres::Reporter` instead of `&mut ()` to receive skip, progress and failure events.
+
 ## License
 
 [MIT](LICENSE)
