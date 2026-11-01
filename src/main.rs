@@ -65,8 +65,9 @@ fn run(cli: &Cli) -> Result<bool, RunError> {
     }
 
     let (mut done, mut failed) = (0, 0);
-    for src in &videos {
-        match process_file(cli, src, width) {
+    for (i, src) in videos.iter().enumerate() {
+        let counter = format!("{}/{}", i + 1, videos.len());
+        match process_file(cli, src, width, &counter) {
             Ok(true) => done += 1,
             Ok(false) => skipped += 1,
             Err(e) => {
@@ -81,7 +82,8 @@ fn run(cli: &Cli) -> Result<bool, RunError> {
 }
 
 /// Resizes one video. Returns Ok(true) if converted, Ok(false) if skipped.
-fn process_file(cli: &Cli, src: &Path, width: u32) -> Result<bool, FileError> {
+/// `counter` (e.g. "2/5") is shown on the progress bar.
+fn process_file(cli: &Cli, src: &Path, width: u32, counter: &str) -> Result<bool, FileError> {
     let dst = output::output_path(src, cli.output.as_deref(), &cli.format, width);
     if dst == src {
         return Err(FileError::SameAsSource);
@@ -107,6 +109,14 @@ fn process_file(cli: &Cli, src: &Path, width: u32) -> Result<bool, FileError> {
     }
 
     println!("{} -> {}", src.display(), dst.display());
-    ffmpeg::resize(src, &dst, width, cli.fps, cli.overwrite, probe.duration)?;
+    ffmpeg::resize(
+        src,
+        &dst,
+        width,
+        cli.fps,
+        cli.overwrite,
+        probe.duration,
+        counter,
+    )?;
     Ok(true)
 }
