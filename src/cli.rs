@@ -13,7 +13,7 @@ pub struct Cli {
     pub inputs: Vec<PathBuf>,
 
     /// Target width in pixels (odd values are bumped to the next even number)
-    #[arg(short, long, env = "VRES_WIDTH")]
+    #[arg(short, long, env = "VRES_WIDTH", default_value_t = 720)]
     pub width: u32,
 
     /// Output frame rate
