@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use regex::Regex;
 
 use crate::error::{BuildError, FileError, RunError};
-use crate::report::{Job, Reporter, SkipReason};
+use crate::report::{Converted, Failed, Job, Reporter, SkipReason, Skipped};
 use crate::{ffmpeg, inputs, output, width};
 
 pub const DEFAULT_WIDTH: u32 = 720;
@@ -26,18 +26,18 @@ pub struct Resizer {
     output_pattern: Regex,
 }
 
-/// Counts of what happened to each video in a run.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+/// What happened to each video in a run, in processing order within each list.
+#[derive(Debug, Default)]
 pub struct Summary {
-    pub done: usize,
-    pub skipped: usize,
-    pub failed: usize,
+    pub converted: Vec<Converted>,
+    pub skipped: Vec<Skipped>,
+    pub failed: Vec<Failed>,
 }
 
 impl Summary {
     /// True if every video was converted or skipped.
     pub fn is_success(&self) -> bool {
-        self.failed == 0
+        self.failed.is_empty()
     }
 }
 
@@ -53,7 +53,7 @@ impl Resizer {
 
     /// Resizes every video in `inputs` (files and/or directories).
     ///
-    /// Problems with a single video are passed to `reporter` and counted in the
+    /// Problems with a single video are passed to `reporter` and recorded in the
     /// [`Summary`]; only problems that stop the whole batch return `Err`.
     pub fn run<P, R>(&self, inputs: &[P], reporter: &mut R) -> Result<Summary, RunError>
     where
@@ -62,21 +62,26 @@ impl Resizer {
     {
         ffmpeg::check_available().map_err(RunError::FfmpegUnavailable)?;
 
-        let mut videos = inputs::collect_videos(inputs, self.recursive)?;
+        let videos = inputs::collect_videos(inputs, self.recursive)?;
         if videos.is_empty() {
             return Err(RunError::NoVideos);
         }
 
         let mut summary = Summary::default();
-        if !self.include_outputs {
-            videos.retain(|src| {
-                let ignore = output::is_output(src, &self.output_pattern);
-                if ignore {
-                    reporter.skipped(src, &SkipReason::MatchesOutputFormat);
-                    summary.skipped += 1;
-                }
-                !ignore
-            });
+        let mut queue = Vec::with_capacity(videos.len());
+        for src in videos {
+            let dst = self.output_path(&src);
+            if !self.include_outputs && output::is_output(&src, &self.output_pattern) {
+                let skipped = Skipped {
+                    src,
+                    dst,
+                    reason: SkipReason::MatchesOutputFormat,
+                };
+                reporter.skipped(&skipped);
+                summary.skipped.push(skipped);
+            } else {
+                queue.push((src, dst));
+            }
         }
 
         if let Some(dir) = &self.output_dir {
@@ -86,65 +91,74 @@ impl Resizer {
             })?;
         }
 
-        let total = videos.len();
-        for (index, src) in videos.iter().enumerate() {
-            match self.process_file(src, index, total, reporter) {
-                Ok(true) => summary.done += 1,
-                Ok(false) => summary.skipped += 1,
-                Err(e) => {
-                    reporter.failed(src, &e);
-                    summary.failed += 1;
+        let total = queue.len();
+        for (index, (src, dst)) in queue.into_iter().enumerate() {
+            match self.process_file(&src, &dst, index, total, reporter) {
+                Ok(None) => {
+                    let converted = Converted { src, dst };
+                    reporter.finished(&converted);
+                    summary.converted.push(converted);
+                }
+                Ok(Some(reason)) => {
+                    let skipped = Skipped { src, dst, reason };
+                    reporter.skipped(&skipped);
+                    summary.skipped.push(skipped);
+                }
+                Err(error) => {
+                    let failed = Failed { src, dst, error };
+                    reporter.failed(&failed);
+                    summary.failed.push(failed);
                 }
             }
         }
         Ok(summary)
     }
 
-    /// Resizes one video. Returns Ok(true) if converted, Ok(false) if skipped.
+    fn output_path(&self, src: &Path) -> PathBuf {
+        output::output_path(src, self.output_dir.as_deref(), &self.format, self.width)
+    }
+
+    /// Resizes one video. Returns the reason if it was skipped.
     fn process_file<R: Reporter + ?Sized>(
         &self,
         src: &Path,
+        dst: &Path,
         index: usize,
         total: usize,
         reporter: &mut R,
-    ) -> Result<bool, FileError> {
-        let dst = output::output_path(src, self.output_dir.as_deref(), &self.format, self.width);
+    ) -> Result<Option<SkipReason>, FileError> {
         if dst == src {
             return Err(FileError::SameAsSource);
         }
 
         let probe = ffmpeg::probe(src)?;
         if probe.width < self.width {
-            let reason = SkipReason::TooNarrow {
+            return Ok(Some(SkipReason::TooNarrow {
                 width: probe.width,
                 target: self.width,
-            };
-            reporter.skipped(src, &reason);
-            return Ok(false);
+            }));
         }
 
         if dst.exists() && !self.overwrite {
-            reporter.skipped(src, &SkipReason::OutputExists(dst));
-            return Ok(false);
+            return Ok(Some(SkipReason::OutputExists));
         }
 
         reporter.started(&Job {
             index,
             total,
             src,
-            dst: &dst,
+            dst,
             duration: probe.duration,
         });
         ffmpeg::resize(
             src,
-            &dst,
+            dst,
             self.width,
             self.fps,
             self.overwrite,
             &mut |position| reporter.progress(position),
         )?;
-        reporter.finished(src);
-        Ok(true)
+        Ok(None)
     }
 }
 

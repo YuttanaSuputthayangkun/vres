@@ -1,9 +1,8 @@
 use std::fmt::Display;
-use std::path::Path;
 use std::time::Duration;
 
 use indicatif::{ProgressBar, ProgressStyle};
-use vres::{FileError, Job, Reporter, SkipReason, Summary};
+use vres::{Converted, Failed, Job, Reporter, SkipReason, Skipped, Summary};
 
 /// Prints run events to the terminal, with a progress bar per conversion.
 #[derive(Default)]
@@ -12,15 +11,18 @@ pub struct Console {
 }
 
 impl Reporter for Console {
-    fn skipped(&mut self, src: &Path, reason: &SkipReason) {
-        let src = src.display();
-        match reason {
+    fn skipped(&mut self, skipped: &Skipped) {
+        let src = skipped.src.display();
+        match &skipped.reason {
             SkipReason::MatchesOutputFormat => println!("skip {src}: matches output format"),
             SkipReason::TooNarrow { width, target } => {
                 println!("skip {src}: width {width} is less than {target}")
             }
-            SkipReason::OutputExists(dst) => {
-                println!("skip {src}: {} exists (use --overwrite)", dst.display())
+            SkipReason::OutputExists => {
+                println!(
+                    "skip {src}: {} exists (use --overwrite)",
+                    skipped.dst.display()
+                )
             }
         }
     }
@@ -39,17 +41,17 @@ impl Reporter for Console {
         }
     }
 
-    fn finished(&mut self, _src: &Path) {
+    fn finished(&mut self, _converted: &Converted) {
         if let Some(bar) = self.bar.take() {
             bar.finish();
         }
     }
 
-    fn failed(&mut self, src: &Path, error: &FileError) {
+    fn failed(&mut self, failed: &Failed) {
         if let Some(bar) = self.bar.take() {
             bar.abandon();
         }
-        eprintln!("failed {}: {error}", src.display());
+        eprintln!("failed {}: {}", failed.src.display(), failed.error);
     }
 }
 
@@ -60,7 +62,9 @@ pub fn width_note(requested: u32, used: u32) {
 pub fn summary(summary: &Summary) {
     println!(
         "done: {}, skipped: {}, failed: {}",
-        summary.done, summary.skipped, summary.failed
+        summary.converted.len(),
+        summary.skipped.len(),
+        summary.failed.len()
     );
 }
 

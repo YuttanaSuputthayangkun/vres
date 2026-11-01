@@ -7,7 +7,9 @@
 //!
 //! let resizer = Resizer::builder().width(1280).fps(24).recursive(true).build()?;
 //! let summary = resizer.run(&["videos/"], &mut ())?;
-//! println!("{} converted", summary.done);
+//! for converted in &summary.converted {
+//!     println!("{} -> {}", converted.src.display(), converted.dst.display());
+//! }
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -23,5 +25,5 @@ mod resizer;
 mod width;
 
 pub use error::{BuildError, FfmpegError, FileError, InputError, RunError};
-pub use report::{Job, Reporter, SkipReason};
+pub use report::{Converted, Failed, Job, Reporter, SkipReason, Skipped};
 pub use resizer::{DEFAULT_FORMAT, DEFAULT_FPS, DEFAULT_WIDTH, Resizer, ResizerBuilder, Summary};

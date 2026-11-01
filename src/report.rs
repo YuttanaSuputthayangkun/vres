@@ -12,7 +12,31 @@ pub enum SkipReason {
     /// The source is narrower than the target width; videos are never upscaled.
     TooNarrow { width: u32, target: u32 },
     /// The output file already exists and overwriting is off.
-    OutputExists(PathBuf),
+    OutputExists,
+}
+
+/// A video that was converted.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Converted {
+    pub src: PathBuf,
+    pub dst: PathBuf,
+}
+
+/// A video that was not converted. `dst` is where its output would have gone.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Skipped {
+    pub src: PathBuf,
+    pub dst: PathBuf,
+    pub reason: SkipReason,
+}
+
+/// A video that failed, either before or during its conversion. `dst` is
+/// where its output would have gone.
+#[derive(Debug)]
+pub struct Failed {
+    pub src: PathBuf,
+    pub dst: PathBuf,
+    pub error: FileError,
 }
 
 /// A conversion that is about to start.
@@ -31,16 +55,16 @@ pub struct Job<'a> {
 /// Receives events while [`Resizer::run`](crate::Resizer::run) works through
 /// the videos. Every method does nothing by default; `()` ignores everything.
 pub trait Reporter {
-    /// `src` will not be converted.
-    fn skipped(&mut self, _src: &Path, _reason: &SkipReason) {}
+    /// A video will not be converted.
+    fn skipped(&mut self, _skipped: &Skipped) {}
     /// A conversion is starting.
     fn started(&mut self, _job: &Job<'_>) {}
     /// The current conversion has written `position` of output.
     fn progress(&mut self, _position: Duration) {}
     /// The current conversion finished successfully.
-    fn finished(&mut self, _src: &Path) {}
-    /// `src` failed, either before or during its conversion.
-    fn failed(&mut self, _src: &Path, _error: &FileError) {}
+    fn finished(&mut self, _converted: &Converted) {}
+    /// A video failed.
+    fn failed(&mut self, _failed: &Failed) {}
 }
 
 impl Reporter for () {}
