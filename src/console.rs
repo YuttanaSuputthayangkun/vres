@@ -66,6 +66,12 @@ pub fn summary(summary: &Summary) {
         summary.skipped.len(),
         summary.failed.len()
     );
+    if !summary.failed.is_empty() {
+        eprintln!("failed files:");
+        for failed in &summary.failed {
+            eprintln!("  {}: {}", failed.src.display(), failed.error);
+        }
+    }
 }
 
 pub fn error(error: &impl Display) {
