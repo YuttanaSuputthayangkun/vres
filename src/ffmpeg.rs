@@ -8,8 +8,8 @@ use crate::error::FfmpegError;
 
 /// Facts about a source video read by ffprobe.
 pub struct Probe {
-    /// Width in pixels of the first video stream.
-    pub width: u32,
+    /// Height in pixels of the first video stream.
+    pub height: u32,
     /// Container duration, if ffprobe reports one.
     pub duration: Option<Duration>,
 }
@@ -36,11 +36,11 @@ pub fn check_available() -> Result<(), FfmpegError> {
     }
 }
 
-/// Reads the width of the first video stream and the duration of `src`, using ffprobe.
+/// Reads the height of the first video stream and the duration of `src`, using ffprobe.
 pub fn probe(src: &Path) -> Result<Probe, FfmpegError> {
     let output = Command::new("ffprobe")
         .args(["-v", "error", "-select_streams", "v:0"])
-        .args(["-show_entries", "stream=width:format=duration"])
+        .args(["-show_entries", "stream=height:format=duration"])
         .args(["-of", "default=noprint_wrappers=1"])
         .arg(src)
         .output()
@@ -57,11 +57,11 @@ pub fn probe(src: &Path) -> Result<Probe, FfmpegError> {
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut width = None;
+    let mut height = None;
     let mut duration = None;
     for line in stdout.lines() {
         match line.trim().split_once('=') {
-            Some(("width", value)) => width = value.parse().ok(),
+            Some(("height", value)) => height = value.parse().ok(),
             // "N/A" when unknown; leave as None.
             Some(("duration", value)) => {
                 duration = value
@@ -72,16 +72,17 @@ pub fn probe(src: &Path) -> Result<Probe, FfmpegError> {
             _ => {}
         }
     }
-    let width = width.ok_or_else(|| FfmpegError::InvalidProbeOutput(stdout.trim().to_string()))?;
-    Ok(Probe { width, duration })
+    let height =
+        height.ok_or_else(|| FfmpegError::InvalidProbeOutput(stdout.trim().to_string()))?;
+    Ok(Probe { height, duration })
 }
 
-/// Resizes `src` to `width` (height follows aspect ratio) at `fps`, writing `dst`.
+/// Resizes `src` to `height` (width follows aspect ratio) at `fps`, writing `dst`.
 /// Calls `on_progress` with the amount of output written so far.
 pub fn resize(
     src: &Path,
     dst: &Path,
-    width: u32,
+    height: u32,
     fps: u32,
     overwrite: bool,
     on_progress: &mut dyn FnMut(Duration),
@@ -91,7 +92,7 @@ pub fn resize(
         .args(["-hide_banner", "-loglevel", "error", "-nostats"])
         .args(["-progress", "pipe:1", "-i"])
         .arg(src)
-        .args(["-vf", &format!("scale={width}:-2")])
+        .args(["-vf", &format!("scale=-2:{height}")])
         .args(["-r", &fps.to_string()])
         .args(["-c:a", "copy"])
         .arg(if overwrite { "-y" } else { "-n" })

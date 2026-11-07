@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use clap::Parser;
 use vres::{BuildError, Resizer};
 
-/// Resize videos to a given width with ffmpeg, preserving aspect ratio.
+/// Resize videos to a given height with ffmpeg, preserving aspect ratio.
 ///
 /// Options can also be set via environment variables or a `.env` file.
 #[derive(Debug, Parser)]
@@ -13,9 +13,9 @@ pub struct Cli {
     #[arg(required = true)]
     pub inputs: Vec<PathBuf>,
 
-    /// Target width in pixels (odd values are bumped to the next even number)
-    #[arg(short, long, env = "VRES_WIDTH", default_value_t = vres::DEFAULT_WIDTH)]
-    pub width: u32,
+    /// Target height in pixels (odd values are bumped to the next even number)
+    #[arg(short = 'H', long, env = "VRES_HEIGHT", default_value_t = vres::DEFAULT_HEIGHT)]
+    pub height: u32,
 
     /// Output frame rate
     #[arg(short = 'r', long, env = "VRES_FPS", default_value_t = vres::DEFAULT_FPS,
@@ -26,7 +26,7 @@ pub struct Cli {
     #[arg(short, long, env = "VRES_OUTPUT")]
     pub output: Option<PathBuf>,
 
-    /// Output file name format; supports {source_name} and {width}
+    /// Output file name format; supports {source_name} and {height}
     #[arg(short, long, env = "VRES_FORMAT", default_value = vres::DEFAULT_FORMAT)]
     pub format: String,
 
@@ -35,7 +35,7 @@ pub struct Cli {
     pub recursive: bool,
 
     /// Also process input files whose name matches the output format at the
-    /// current width (e.g. clip_720.mp4); these are ignored by default
+    /// current height (e.g. clip_720.mp4); these are ignored by default
     #[arg(long, env = "VRES_INCLUDE_OUTPUTS")]
     pub include_outputs: bool,
 
@@ -56,7 +56,7 @@ impl Cli {
     /// Builds a [`Resizer`] from the parsed options.
     pub fn resizer(&self) -> Result<Resizer, BuildError> {
         let mut builder = Resizer::builder()
-            .width(self.width)
+            .height(self.height)
             .fps(self.fps)
             .format(&self.format)
             .recursive(self.recursive)

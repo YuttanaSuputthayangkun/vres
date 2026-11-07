@@ -21,8 +21,8 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    if resizer.width() != cli.width {
-        console.width_note(cli.width, resizer.width());
+    if resizer.height() != cli.height {
+        console.height_note(cli.height, resizer.height());
     }
 
     match resizer.run(&cli.inputs, &mut console) {

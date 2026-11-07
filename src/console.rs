@@ -37,9 +37,9 @@ impl Console {
         }
     }
 
-    pub fn width_note(&self, requested: u32, used: u32) {
+    pub fn height_note(&self, requested: u32, used: u32) {
         if !self.quiet {
-            eprintln!("note: width {requested} is not valid, using {used}");
+            eprintln!("note: height {requested} is not valid, using {used}");
         }
     }
 
@@ -73,8 +73,8 @@ impl Reporter for Console {
             SkipReason::MatchesOutputFormat => {
                 self.status(format_args!("skip {src}: matches output format"))
             }
-            SkipReason::TooNarrow { width, target } => self.status(format_args!(
-                "skip {src}: width {width} is less than {target}"
+            SkipReason::TooShort { height, target } => self.status(format_args!(
+                "skip {src}: height {height} is less than {target}"
             )),
             SkipReason::OutputExists => self.status(format_args!(
                 "skip {src}: {} exists (use --overwrite)",
@@ -135,10 +135,10 @@ fn summary_json(summary: &Summary) -> Value {
             let mut value = json!({ "src": path(&s.src), "dst": path(&s.dst) });
             let reason = match &s.reason {
                 SkipReason::MatchesOutputFormat => "matches_output_format",
-                SkipReason::TooNarrow { width, target } => {
-                    value["width"] = json!(width);
+                SkipReason::TooShort { height, target } => {
+                    value["height"] = json!(height);
                     value["target"] = json!(target);
-                    "too_narrow"
+                    "too_short"
                 }
                 SkipReason::OutputExists => "output_exists",
             };

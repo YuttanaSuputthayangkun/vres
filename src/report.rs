@@ -6,11 +6,11 @@ use crate::error::FileError;
 /// Why a source video was not converted.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SkipReason {
-    /// The file name matches the output format at the target width, so it is
+    /// The file name matches the output format at the target height, so it is
     /// most likely a previous output.
     MatchesOutputFormat,
-    /// The source is narrower than the target width; videos are never upscaled.
-    TooNarrow { width: u32, target: u32 },
+    /// The source is shorter than the target height; videos are never upscaled.
+    TooShort { height: u32, target: u32 },
     /// The output file already exists and overwriting is off.
     OutputExists,
 }

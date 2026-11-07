@@ -5,18 +5,18 @@ use regex::Regex;
 
 use crate::error::{BuildError, FileError, RunError};
 use crate::report::{Converted, Failed, Job, Reporter, SkipReason, Skipped};
-use crate::{ffmpeg, inputs, output, width};
+use crate::{ffmpeg, height, inputs, output};
 
-pub const DEFAULT_WIDTH: u32 = 720;
+pub const DEFAULT_HEIGHT: u32 = 720;
 pub const DEFAULT_FPS: u32 = 30;
-pub const DEFAULT_FORMAT: &str = "{source_name}_{width}";
+pub const DEFAULT_FORMAT: &str = "{source_name}_{height}";
 
-/// Resizes videos to a fixed width with ffmpeg, preserving aspect ratio.
+/// Resizes videos to a fixed height with ffmpeg, preserving aspect ratio.
 ///
 /// Create one with [`Resizer::builder`].
 #[derive(Debug, Clone)]
 pub struct Resizer {
-    width: u32,
+    height: u32,
     fps: u32,
     output_dir: Option<PathBuf>,
     format: String,
@@ -46,9 +46,9 @@ impl Resizer {
         ResizerBuilder::default()
     }
 
-    /// The target width, after being made valid (even and at least 2).
-    pub fn width(&self) -> u32 {
-        self.width
+    /// The target height, after being made valid (even and at least 2).
+    pub fn height(&self) -> u32 {
+        self.height
     }
 
     /// Resizes every video in `inputs` (files and/or directories).
@@ -115,7 +115,7 @@ impl Resizer {
     }
 
     fn output_path(&self, src: &Path) -> PathBuf {
-        output::output_path(src, self.output_dir.as_deref(), &self.format, self.width)
+        output::output_path(src, self.output_dir.as_deref(), &self.format, self.height)
     }
 
     /// Resizes one video. Returns the reason if it was skipped.
@@ -132,10 +132,10 @@ impl Resizer {
         }
 
         let probe = ffmpeg::probe(src)?;
-        if probe.width < self.width {
-            return Ok(Some(SkipReason::TooNarrow {
-                width: probe.width,
-                target: self.width,
+        if probe.height < self.height {
+            return Ok(Some(SkipReason::TooShort {
+                height: probe.height,
+                target: self.height,
             }));
         }
 
@@ -153,7 +153,7 @@ impl Resizer {
         ffmpeg::resize(
             src,
             dst,
-            self.width,
+            self.height,
             self.fps,
             self.overwrite,
             &mut |position| reporter.progress(position),
@@ -167,7 +167,7 @@ impl Resizer {
 /// inputs that look like previous outputs, and never overwrite.
 #[derive(Debug, Clone)]
 pub struct ResizerBuilder {
-    width: u32,
+    height: u32,
     fps: u32,
     output_dir: Option<PathBuf>,
     format: String,
@@ -179,7 +179,7 @@ pub struct ResizerBuilder {
 impl Default for ResizerBuilder {
     fn default() -> Self {
         Self {
-            width: DEFAULT_WIDTH,
+            height: DEFAULT_HEIGHT,
             fps: DEFAULT_FPS,
             output_dir: None,
             format: DEFAULT_FORMAT.to_string(),
@@ -191,10 +191,10 @@ impl Default for ResizerBuilder {
 }
 
 impl ResizerBuilder {
-    /// Target width in pixels. Odd values are bumped to the next even number;
-    /// check [`Resizer::width`] for the value used.
-    pub fn width(mut self, width: u32) -> Self {
-        self.width = width;
+    /// Target height in pixels. Odd values are bumped to the next even number;
+    /// check [`Resizer::height`] for the value used.
+    pub fn height(mut self, height: u32) -> Self {
+        self.height = height;
         self
     }
 
@@ -210,7 +210,7 @@ impl ResizerBuilder {
         self
     }
 
-    /// Output file name format; supports `{source_name}` and `{width}`.
+    /// Output file name format; supports `{source_name}` and `{height}`.
     /// The source extension is kept.
     pub fn format(mut self, format: impl Into<String>) -> Self {
         self.format = format.into();
@@ -224,7 +224,7 @@ impl ResizerBuilder {
     }
 
     /// Also process inputs whose name matches the output format at the
-    /// target width (e.g. `clip_720.mp4`).
+    /// target height (e.g. `clip_720.mp4`).
     pub fn include_outputs(mut self, include_outputs: bool) -> Self {
         self.include_outputs = include_outputs;
         self
@@ -240,11 +240,11 @@ impl ResizerBuilder {
         if self.fps == 0 {
             return Err(BuildError::ZeroFps);
         }
-        let width = width::normalize_width(self.width);
+        let height = height::normalize_height(self.height);
         let output_pattern =
-            output::output_pattern(&self.format, width).map_err(BuildError::OutputPattern)?;
+            output::output_pattern(&self.format, height).map_err(BuildError::OutputPattern)?;
         Ok(Resizer {
-            width,
+            height,
             fps: self.fps,
             output_dir: self.output_dir,
             format: self.format,
@@ -263,15 +263,15 @@ mod tests {
     #[test]
     fn builds_with_defaults() {
         let resizer = Resizer::builder().build().unwrap();
-        assert_eq!(resizer.width(), DEFAULT_WIDTH);
+        assert_eq!(resizer.height(), DEFAULT_HEIGHT);
         assert_eq!(resizer.fps, DEFAULT_FPS);
         assert_eq!(resizer.format, DEFAULT_FORMAT);
     }
 
     #[test]
-    fn normalizes_width() {
-        let resizer = Resizer::builder().width(853).build().unwrap();
-        assert_eq!(resizer.width(), 854);
+    fn normalizes_height() {
+        let resizer = Resizer::builder().height(853).build().unwrap();
+        assert_eq!(resizer.height(), 854);
     }
 
     #[test]
