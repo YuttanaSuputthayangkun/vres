@@ -43,6 +43,28 @@ With `--json`, stdout contains only an object with `converted`, `skipped` and `f
 
 Files are skipped when they're shorter than the target height (no upscaling), when the output already exists, or when they look like a previous output (e.g. `clip_720.mp4`).
 
+## Clean up sources
+
+```sh
+vres clean [OPTIONS] <INPUTS>...
+```
+
+Moves source videos whose output already exists (e.g. `clip.mp4` when `clip_720.mp4` is next to it) to the Recycle Bin (Trash on macOS/Linux). Outputs are never touched, and empty outputs (e.g. from a failed conversion) don't count. Use the same `-H`, `-f` and `-o` as the resize run so the outputs are found; the `VRES_*` variables and `.env` apply here too.
+
+```sh
+vres -H 1080 videos/          # resize
+vres clean -H 1080 videos/    # lists the originals, then asks before trashing them
+```
+
+| Option | Description |
+|---|---|
+| `-H`, `-o`, `-f`, `-R`, `-q`, `--json` | Same as above. |
+| `-y, --yes` | Skip the confirmation prompt. Required when stdin is not a terminal (scripts, pipes). Has no env var, so it can't be turned on from `.env`. |
+
+Without `--yes`, the matching files are listed and you're asked `Move N files to the Recycle Bin? [y/N]`; only `y` or `yes` proceeds. With `--json`, stdout contains `{ "trashed": [...], "failed": [...] }`; each entry has `src` and `dst`, and failed entries add an `error`. The exit code is non-zero if any file could not be moved.
+
+A file literally named `clean` must be passed as `./clean` when resizing.
+
 ## Configuration
 
 Any option can be set in a `.env` file in the current directory. See [`.env.example`](.env.example). Command-line arguments take precedence over environment variables, which take precedence over `.env`.
@@ -63,6 +85,20 @@ let summary = resizer.run(&["videos/"], &mut ())?;
 ```
 
 Pass your own `vres::Reporter` instead of `&mut ()` to receive skip, progress and failure events.
+
+To clean up originals, `Resizer::sources_with_outputs` lists sources whose output exists. Enable the `trash` feature to move them to the Recycle Bin. It deletes without asking, so confirm with the user first:
+
+```toml
+vres = { git = "https://github.com/YuttanaSuputthayangkun/vres", default-features = false, features = ["trash"] }
+```
+
+```rust
+let found = resizer.sources_with_outputs(&["videos/"])?;
+let summary = vres::trash_sources(found);
+for failed in &summary.failed {
+    eprintln!("{}: {}", failed.src.display(), failed.error);
+}
+```
 
 ## License
 

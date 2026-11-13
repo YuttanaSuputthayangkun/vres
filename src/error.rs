@@ -163,6 +163,26 @@ impl From<InputError> for RunError {
     }
 }
 
+/// A file could not be moved to the Recycle Bin by
+/// [`trash_sources`](crate::trash_sources).
+#[cfg(feature = "trash")]
+#[derive(Debug)]
+pub struct TrashError(pub(crate) trash::Error);
+
+#[cfg(feature = "trash")]
+impl fmt::Display for TrashError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+#[cfg(feature = "trash")]
+impl std::error::Error for TrashError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.0)
+    }
+}
+
 /// Errors from [`ResizerBuilder::build`](crate::ResizerBuilder::build).
 #[derive(Debug)]
 pub enum BuildError {

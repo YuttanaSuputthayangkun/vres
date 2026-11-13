@@ -161,7 +161,7 @@ fn summary_json(summary: &Summary) -> Value {
 }
 
 /// Paths that are not valid Unicode are written lossily.
-fn path(path: &Path) -> String {
+pub fn path(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 

@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use regex::Regex;
 
-use crate::error::{BuildError, FileError, RunError};
+use crate::error::{BuildError, FileError, InputError, RunError};
 use crate::report::{Converted, Failed, Job, Reporter, SkipReason, Skipped};
 use crate::{ffmpeg, height, inputs, output};
 
@@ -112,6 +112,27 @@ impl Resizer {
             }
         }
         Ok(summary)
+    }
+
+    /// Finds source videos in `inputs` whose output already exists, e.g. to
+    /// remove the originals after a run. Files that are themselves outputs are
+    /// never returned, and empty outputs (likely from a failed conversion) do
+    /// not count. Does not need ffmpeg.
+    pub fn sources_with_outputs<P: AsRef<Path>>(
+        &self,
+        inputs: &[P],
+    ) -> Result<Vec<Converted>, InputError> {
+        let videos = inputs::collect_videos(inputs, self.recursive)?;
+        Ok(videos
+            .into_iter()
+            .filter(|src| !output::is_output(src, &self.output_pattern))
+            .filter_map(|src| {
+                let dst = self.output_path(&src);
+                let has_output =
+                    dst != src && fs::metadata(&dst).is_ok_and(|m| m.is_file() && m.len() > 0);
+                has_output.then_some(Converted { src, dst })
+            })
+            .collect())
     }
 
     fn output_path(&self, src: &Path) -> PathBuf {
@@ -272,6 +293,36 @@ mod tests {
     fn normalizes_height() {
         let resizer = Resizer::builder().height(853).build().unwrap();
         assert_eq!(resizer.height(), 854);
+    }
+
+    #[test]
+    fn finds_sources_with_outputs() {
+        let root = std::env::temp_dir().join(format!("vres_test_sources_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        for (name, contents) in [
+            ("a.mp4", &b"src"[..]),
+            ("a_720.mp4", b"out"),
+            ("b.mp4", b"src"),
+            ("c.mp4", b"src"),
+            ("c_720.mp4", b""),
+            ("d_720.mp4", b"out"),
+        ] {
+            fs::write(root.join(name), contents).unwrap();
+        }
+
+        let resizer = Resizer::builder().build().unwrap();
+        let found = resizer
+            .sources_with_outputs(std::slice::from_ref(&root))
+            .unwrap();
+        assert_eq!(
+            found,
+            vec![Converted {
+                src: root.join("a.mp4"),
+                dst: root.join("a_720.mp4"),
+            }]
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
